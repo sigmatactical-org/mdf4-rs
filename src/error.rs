@@ -114,6 +114,16 @@ pub enum Error {
         /// The address where the cycle was detected
         address: u64,
     },
+
+    /// A cycle was detected while walking a linked list of blocks (e.g. the
+    /// data-group, channel-group, channel, or data-list chain).
+    ///
+    /// This indicates file corruption where block links form a loop, which
+    /// would otherwise cause the parser to loop forever.
+    LinkCycle {
+        /// The link address that was visited twice
+        address: u64,
+    },
 }
 
 impl fmt::Display for Error {
@@ -161,6 +171,9 @@ impl fmt::Display for Error {
                     f,
                     "Conversion chain cycle detected at block address {address:#x}"
                 )
+            }
+            Error::LinkCycle { address } => {
+                write!(f, "Block link cycle detected at address {address:#x}")
             }
         }
     }

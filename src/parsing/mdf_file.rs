@@ -3,6 +3,7 @@ use crate::{
     Error, Result,
     blocks::{BlockParse, ChannelGroupBlock, DataGroupBlock, HeaderBlock, IdentificationBlock},
 };
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::Read;
 
@@ -64,9 +65,15 @@ impl MdfFile {
         let is_unfinalized = identification.file_id.trim() == "UnFinMF";
 
         // Parse Data Groups, assume a linked list of data groups.
+        // Track visited link addresses to guard against malformed files whose
+        // "linked lists" contain cycles, which would otherwise loop forever.
         let mut data_groups = Vec::new();
+        let mut seen_dg: HashSet<u64> = HashSet::new();
         let mut dg_addr = header.first_dg_addr;
         while dg_addr != 0 {
+            if !seen_dg.insert(dg_addr) {
+                return Err(Error::LinkCycle { address: dg_addr });
+            }
             let dg_offset = dg_addr as usize;
 
             // Bounds check
@@ -85,7 +92,13 @@ impl MdfFile {
 
             let mut next_cg_addr = data_group_block.first_cg_addr;
             let mut raw_channel_groups = Vec::new();
+            let mut seen_cg: HashSet<u64> = HashSet::new();
             while next_cg_addr != 0 {
+                if !seen_cg.insert(next_cg_addr) {
+                    return Err(Error::LinkCycle {
+                        address: next_cg_addr,
+                    });
+                }
                 // Parse channel group
                 let offset = next_cg_addr as usize;
 

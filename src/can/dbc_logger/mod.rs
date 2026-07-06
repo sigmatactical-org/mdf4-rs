@@ -77,21 +77,22 @@ impl MessageBuffer {
         }
     }
 
-    fn push_physical(&mut self, timestamp_us: u64, physical_values: &[f64]) {
+    /// Append physical samples straight from the shared decode buffer, selecting
+    /// this buffer's signals via `signal_indices`. Keeps the hot path allocation-free
+    /// (no intermediate `Vec` per frame).
+    fn push_physical_indexed(&mut self, timestamp_us: u64, decode_buf: &[f64]) {
         self.timestamps.push(timestamp_us);
-        for (i, &value) in physical_values.iter().enumerate() {
-            if i < self.physical_values.len() {
-                self.physical_values[i].push(value);
-            }
+        for (out, &idx) in self.physical_values.iter_mut().zip(self.signal_indices.iter()) {
+            out.push(decode_buf.get(idx).copied().unwrap_or(0.0));
         }
     }
 
-    fn push_raw(&mut self, timestamp_us: u64, raw_values: &[i64]) {
+    /// Append raw samples straight from the shared decode buffer (see
+    /// [`Self::push_physical_indexed`]).
+    fn push_raw_indexed(&mut self, timestamp_us: u64, decode_buf: &[i64]) {
         self.timestamps.push(timestamp_us);
-        for (i, &value) in raw_values.iter().enumerate() {
-            if i < self.raw_values.len() {
-                self.raw_values[i].push(value);
-            }
+        for (out, &idx) in self.raw_values.iter_mut().zip(self.signal_indices.iter()) {
+            out.push(decode_buf.get(idx).copied().unwrap_or(0));
         }
     }
 
@@ -576,23 +577,14 @@ impl<W: crate::writer::MdfWrite> CanDbcLogger<W> {
             (dbc_id, None)
         };
 
+        let store_raw = self.config.store_raw_values;
         if let Some(buffer) = self.buffers.get_mut(&buffer_key) {
-            if self.config.store_raw_values {
-                // Extract values using pre-computed signal indices
-                let raw_values: Vec<i64> = buffer
-                    .signal_indices
-                    .iter()
-                    .map(|&idx| self.decode_raw_buf[idx])
-                    .collect();
-                buffer.push_raw(timestamp_us, &raw_values);
+            // Read directly from the shared decode buffers using pre-computed
+            // signal indices — no per-frame allocation.
+            if store_raw {
+                buffer.push_raw_indexed(timestamp_us, &self.decode_raw_buf);
             } else {
-                // Extract values using pre-computed signal indices
-                let physical_values: Vec<f64> = buffer
-                    .signal_indices
-                    .iter()
-                    .map(|&idx| self.decode_buf[idx])
-                    .collect();
-                buffer.push_physical(timestamp_us, &physical_values);
+                buffer.push_physical_indexed(timestamp_us, &self.decode_buf);
             }
             return true;
         }

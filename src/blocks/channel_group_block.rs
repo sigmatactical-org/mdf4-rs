@@ -116,9 +116,24 @@ impl ChannelGroupBlock {
     pub fn read_channels(&mut self, mmap: &[u8]) -> Result<Vec<ChannelBlock>> {
         let mut channels = Vec::new();
         let mut current_ch_addr = self.first_ch_addr;
+        // Guard against corrupt files whose channel chain contains a cycle.
+        let mut seen = alloc::collections::BTreeSet::new();
 
         while current_ch_addr != 0 {
+            if !seen.insert(current_ch_addr) {
+                return Err(crate::Error::LinkCycle {
+                    address: current_ch_addr,
+                });
+            }
             let ch_offset = current_ch_addr as usize;
+            if ch_offset >= mmap.len() {
+                return Err(crate::Error::TooShortBuffer {
+                    actual: mmap.len(),
+                    expected: ch_offset + 1,
+                    file: file!(),
+                    line: line!(),
+                });
+            }
             let mut channel = ChannelBlock::from_bytes(&mmap[ch_offset..])?;
             channel.resolve_conversion(mmap)?;
             current_ch_addr = channel.next_ch_addr;

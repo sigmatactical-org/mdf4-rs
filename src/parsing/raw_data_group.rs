@@ -93,7 +93,14 @@ impl RawDataGroup {
 
         // Start at the group's primary data pointer
         let mut current_block_address = self.block.data_block_addr;
+        // Guard against cyclic DL chains in corrupt files.
+        let mut seen_dl = alloc::collections::BTreeSet::new();
         while current_block_address != 0 {
+            if !seen_dl.insert(current_block_address) {
+                return Err(Error::LinkCycle {
+                    address: current_block_address,
+                });
+            }
             let byte_offset = current_block_address as usize;
 
             // Read the block header
@@ -170,7 +177,14 @@ impl RawDataGroup {
         let mut collected_blocks = Vec::new();
 
         let mut current_block_address = self.block.data_block_addr;
+        // Guard against cyclic DL chains in corrupt files.
+        let mut seen_dl = alloc::collections::BTreeSet::new();
         while current_block_address != 0 {
+            if !seen_dl.insert(current_block_address) {
+                return Err(Error::LinkCycle {
+                    address: current_block_address,
+                });
+            }
             let byte_offset = current_block_address as usize;
             let block_header = BlockHeader::from_bytes(&mmap[byte_offset..byte_offset + 24])?;
 
