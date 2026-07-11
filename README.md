@@ -108,6 +108,12 @@ mdf4-rs requires **Rust 1.90.0** or later (**edition 2024**, first supported in 
 - [API Reference](https://docs.rs/mdf4-rs)
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - Internal design (includes [Embedded-first](./ARCHITECTURE.md#embedded-first))
 
+## Brand & artwork
+
+© Sigma Tactical Group. **All rights reserved.**
+
+The Sigma Tactical Group name, logos, marks, artwork, and visual identity are **proprietary**. They are not covered by this repository's source-code license. See [BRANDING.md](BRANDING.md).
+
 ## License
 
 Licensed under either of:
