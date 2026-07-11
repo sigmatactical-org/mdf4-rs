@@ -82,7 +82,11 @@ impl MessageBuffer {
     /// (no intermediate `Vec` per frame).
     fn push_physical_indexed(&mut self, timestamp_us: u64, decode_buf: &[f64]) {
         self.timestamps.push(timestamp_us);
-        for (out, &idx) in self.physical_values.iter_mut().zip(self.signal_indices.iter()) {
+        for (out, &idx) in self
+            .physical_values
+            .iter_mut()
+            .zip(self.signal_indices.iter())
+        {
             out.push(decode_buf.get(idx).copied().unwrap_or(0.0));
         }
     }
