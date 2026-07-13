@@ -4,10 +4,11 @@ A safe, efficient Rust library for reading and writing ASAM MDF 4 (Measurement D
 
 Maintained by **[Sigma Tactical Group](https://github.com/sigmatactical-org)** for measurement logging in the Sigma stack. The crates.io package name **`mdf4-rs`** is unchanged for semver continuity. Earlier standalone development and contributors are upstream lineage — see [`CONTRIBUTORS.md`](CONTRIBUTORS.md).
 
+[![CI](https://github.com/sigmatactical-org/mdf4-rs/actions/workflows/mdf4-rs.yml/badge.svg?branch=main)](https://github.com/sigmatactical-org/mdf4-rs/actions/workflows/mdf4-rs.yml)
 [![Crates.io](https://img.shields.io/crates/v/mdf4-rs.svg)](https://crates.io/crates/mdf4-rs)
 [![Documentation](https://docs.rs/mdf4-rs/badge.svg)](https://docs.rs/mdf4-rs)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
-[![MSRV](https://img.shields.io/badge/MSRV-1.90.0-blue.svg)](https://www.rust-lang.org)
+[![MSRV](https://img.shields.io/badge/MSRV-1.92.0-blue.svg)](https://www.rust-lang.org)
 
 ## Features
 
@@ -101,7 +102,7 @@ See [`examples/`](./examples/) for complete working examples:
 
 ## Minimum Supported Rust Version (MSRV)
 
-mdf4-rs requires **Rust 1.90.0** or later (**edition 2024**, first supported in Rust 1.85.0).
+mdf4-rs requires **Rust 1.92.0** or later (**edition 2024**, first supported in Rust 1.85.0).
 
 ## Documentation
 
