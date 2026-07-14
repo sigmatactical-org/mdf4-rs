@@ -72,9 +72,6 @@ version = "0.9.1"
 name = "index_benchmark"
 harness = false
 
-[lints.rust]
-unsafe_code = "forbid"
-
 [lints.clippy]
 collapsible_if = "allow"
 uninlined_format_args = "allow"

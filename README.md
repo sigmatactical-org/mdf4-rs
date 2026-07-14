@@ -1,14 +1,14 @@
 # mdf4-rs
 
-A safe, efficient Rust library for reading and writing ASAM MDF 4 (Measurement Data Format) files.
-
-Maintained by **[Sigma Tactical Group](https://github.com/sigmatactical-org)** for measurement logging in the Sigma stack. The crates.io package name **`mdf4-rs`** is unchanged for semver continuity. Earlier standalone development and contributors are upstream lineage — see [`CONTRIBUTORS.md`](CONTRIBUTORS.md).
-
-[![CI](https://github.com/sigmatactical-org/mdf4-rs/actions/workflows/mdf4-rs.yml/badge.svg?branch=main)](https://github.com/sigmatactical-org/mdf4-rs/actions/workflows/mdf4-rs.yml)
+[![CI](https://github.com/sigmatactical-org/mdf4-rs/actions/workflows/ci.yml/badge.svg)](https://github.com/sigmatactical-org/mdf4-rs/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/mdf4-rs.svg)](https://crates.io/crates/mdf4-rs)
 [![Documentation](https://docs.rs/mdf4-rs/badge.svg)](https://docs.rs/mdf4-rs)
 [![License](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](#license)
 [![MSRV](https://img.shields.io/badge/MSRV-1.97.0-blue.svg)](https://www.rust-lang.org)
+
+A safe, efficient Rust library for reading and writing ASAM MDF 4 (Measurement Data Format) files.
+
+Maintained by **[Sigma Tactical Group](https://github.com/sigmatactical-org)** for measurement logging in the Sigma stack. The crates.io package name **`mdf4-rs`** is unchanged for semver continuity. Earlier standalone development and contributors are upstream lineage — see [`CONTRIBUTORS.md`](CONTRIBUTORS.md).
 
 ## Features
 
