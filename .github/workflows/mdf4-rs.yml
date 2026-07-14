@@ -1,4 +1,4 @@
-name: mdf4-rs
+name: CI
 
 on:
   push:
