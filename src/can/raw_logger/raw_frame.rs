@@ -1,8 +1,6 @@
 //! [`RawFrame`].
 
-#[cfg(feature = "can")]
-use super::super::fd::{FdFlags, MAX_FD_DATA_LEN};
-use crate::can::fd::MAX_FD_DATA_LEN;
+use crate::can::fd::{FdFlags, MAX_FD_DATA_LEN};
 #[allow(unused_imports)]
 use super::*;
 use crate::bus_logging::timestamp_to_seconds;
