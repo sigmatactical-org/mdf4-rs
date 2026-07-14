@@ -2,8 +2,6 @@
 
 #[allow(unused_imports)]
 use super::*;
-#[cfg(feature = "compression")]
-use crate::blocks::DzBlock;
 
 /// A data block that may contain borrowed or owned data.
 ///

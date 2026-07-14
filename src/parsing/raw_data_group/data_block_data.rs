@@ -2,8 +2,6 @@
 
 #[allow(unused_imports)]
 use super::*;
-#[cfg(feature = "compression")]
-use crate::blocks::DzBlock;
 
 /// Either a reference to existing data or owned decompressed data.
 #[derive(Debug)]

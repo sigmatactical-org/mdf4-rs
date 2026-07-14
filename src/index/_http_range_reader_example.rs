@@ -2,8 +2,6 @@
 
 #[allow(unused_imports)]
 use super::*;
-#[cfg(feature = "compression")]
-use crate::blocks::DzBlock;
 
 /// Example HTTP range reader (would be implemented in production)
 /// ```rust,ignore

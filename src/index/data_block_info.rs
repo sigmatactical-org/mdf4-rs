@@ -2,8 +2,6 @@
 
 #[allow(unused_imports)]
 use super::*;
-#[cfg(feature = "compression")]
-use crate::blocks::DzBlock;
 
 /// Location and metadata for a data block within the MDF file.
 ///

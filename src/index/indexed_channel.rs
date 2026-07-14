@@ -2,8 +2,6 @@
 
 #[allow(unused_imports)]
 use super::*;
-#[cfg(feature = "compression")]
-use crate::blocks::DzBlock;
 use crate::blocks::{ConversionBlock, DataType};
 
 /// Metadata for a single channel, containing all information needed to decode values.

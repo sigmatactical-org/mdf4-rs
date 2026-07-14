@@ -1,9 +1,9 @@
 //! [`RawFrame`].
 
-use crate::can::fd::{FdFlags, MAX_FD_DATA_LEN};
 #[allow(unused_imports)]
 use super::*;
 use crate::bus_logging::timestamp_to_seconds;
+use crate::can::fd::{FdFlags, MAX_FD_DATA_LEN};
 use alloc::vec::Vec;
 
 /// A buffered raw CAN frame in ASAM format.

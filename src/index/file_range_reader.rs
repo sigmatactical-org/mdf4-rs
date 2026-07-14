@@ -2,8 +2,6 @@
 
 #[allow(unused_imports)]
 use super::*;
-#[cfg(feature = "compression")]
-use crate::blocks::DzBlock;
 use crate::{Error, Result};
 use std::io::{Read, Seek, SeekFrom};
 

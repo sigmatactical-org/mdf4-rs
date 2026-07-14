@@ -2,13 +2,6 @@
 
 #[allow(unused_imports)]
 use super::*;
-use crate::{
-    Error, Result,
-    blocks::common::{BlockHeader, BlockParse, read_u8, read_u32, read_u64, validate_buffer_size},
-};
-use alloc::string::ToString;
-use alloc::vec;
-use alloc::vec::Vec;
 
 /// Compression algorithm used in DZ block.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
