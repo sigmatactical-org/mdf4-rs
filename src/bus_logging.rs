@@ -3,10 +3,18 @@
 //! This module provides common traits and helper functions used by
 //! CAN, Ethernet, LIN, and FlexRay loggers.
 
+mod bus_frame;
+mod bus_logger_config;
+mod bus_logger_stats;
+mod timestamped_frame;
+pub use bus_frame::BusFrame;
+pub use bus_logger_config::BusLoggerConfig;
+pub use bus_logger_stats::BusLoggerStats;
+pub use timestamped_frame::TimestampedFrame;
+
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use crate::blocks::SourceBlock;
 use crate::writer::MdfWrite;
 use crate::{DataType, DecodedValue, MdfWriter, Result};
 
@@ -17,50 +25,6 @@ pub const MICROS_TO_SECONDS: f64 = 1.0 / 1_000_000.0;
 #[inline]
 pub fn timestamp_to_seconds(timestamp_us: u64) -> f64 {
     timestamp_us as f64 * MICROS_TO_SECONDS
-}
-
-/// A buffered frame entry with timestamp.
-pub struct TimestampedFrame<F> {
-    /// Timestamp in seconds (ASAM uses float64 seconds).
-    pub timestamp_s: f64,
-    /// The frame data.
-    pub frame: F,
-}
-
-impl<F> TimestampedFrame<F> {
-    /// Create a new timestamped frame from microseconds.
-    #[inline]
-    pub fn new(timestamp_us: u64, frame: F) -> Self {
-        Self {
-            timestamp_s: timestamp_to_seconds(timestamp_us),
-            frame,
-        }
-    }
-}
-
-/// Trait for frame types that can be serialized to bytes.
-pub trait BusFrame: Clone {
-    /// Serialize the frame to bytes for MDF storage.
-    fn to_mdf_bytes(&self) -> Vec<u8>;
-
-    /// Get the frame size in bytes.
-    fn mdf_size(&self) -> usize {
-        self.to_mdf_bytes().len()
-    }
-}
-
-/// Common configuration for bus loggers.
-pub struct BusLoggerConfig {
-    /// The source/bus/interface name.
-    pub source_name: String,
-    /// Channel group name pattern (e.g., "{source}_CAN_DataFrame").
-    pub group_name: String,
-    /// Data channel name (e.g., "CAN_DataFrame", "LIN_Frame").
-    pub data_channel_name: String,
-    /// Size of the data channel in bits.
-    pub data_channel_bits: u32,
-    /// Source block for the bus type.
-    pub source_block: SourceBlock,
 }
 
 /// Initialize a bus logging channel group with timestamp and data channels.
@@ -139,19 +103,6 @@ where
 
     writer.finish_data_block(channel_group)?;
     Ok(())
-}
-
-/// Statistics for a bus logger.
-#[derive(Debug, Clone, Default)]
-pub struct BusLoggerStats {
-    /// Total number of frames logged.
-    pub total_frames: usize,
-    /// Number of transmitted frames.
-    pub tx_frames: usize,
-    /// Number of received frames.
-    pub rx_frames: usize,
-    /// Number of error frames.
-    pub error_frames: usize,
 }
 
 #[cfg(test)]

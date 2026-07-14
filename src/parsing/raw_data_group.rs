@@ -1,3 +1,8 @@
+mod data_block_data;
+mod resolved_data_block;
+pub use data_block_data::DataBlockData;
+pub use resolved_data_block::ResolvedDataBlock;
+
 use super::RawChannelGroup;
 use crate::{
     Error, Result,
@@ -10,62 +15,6 @@ use alloc::vec::Vec;
 
 #[cfg(feature = "compression")]
 use crate::blocks::DzBlock;
-
-/// Either a reference to existing data or owned decompressed data.
-#[derive(Debug)]
-pub enum DataBlockData<'a> {
-    /// Reference to memory-mapped data (uncompressed DT/DV blocks).
-    Borrowed(&'a [u8]),
-    /// Owned decompressed data (from DZ blocks).
-    #[cfg(feature = "compression")]
-    Owned(Vec<u8>),
-}
-
-impl<'a> DataBlockData<'a> {
-    /// Get the data as a slice.
-    pub fn as_slice(&self) -> &[u8] {
-        match self {
-            DataBlockData::Borrowed(s) => s,
-            #[cfg(feature = "compression")]
-            DataBlockData::Owned(v) => v.as_slice(),
-        }
-    }
-
-    /// Get the length of the data.
-    pub fn len(&self) -> usize {
-        self.as_slice().len()
-    }
-
-    /// Check if the data is empty.
-    pub fn is_empty(&self) -> bool {
-        self.as_slice().is_empty()
-    }
-}
-
-/// A data block that may contain borrowed or owned data.
-///
-/// This allows handling both regular DT/DV blocks (zero-copy) and
-/// decompressed DZ blocks (owned data) with a unified interface.
-#[derive(Debug)]
-pub struct ResolvedDataBlock<'a> {
-    /// Original block type ID (e.g., "##DT", "##DV").
-    pub block_id: &'static str,
-    /// The data contents (may be borrowed or owned).
-    pub data: DataBlockData<'a>,
-}
-
-impl<'a> ResolvedDataBlock<'a> {
-    /// Iterate over raw records of fixed size.
-    ///
-    /// # Arguments
-    /// * `record_size` - Size in bytes of one record (including record ID)
-    ///
-    /// # Returns
-    /// An iterator yielding each raw record slice.
-    pub fn records(&self, record_size: usize) -> impl Iterator<Item = &[u8]> {
-        self.data.as_slice().chunks_exact(record_size)
-    }
-}
 
 #[derive(Debug, Clone)]
 pub struct RawDataGroup {

@@ -31,6 +31,7 @@
 //!
 //! # Example (std feature)
 //!
+
 #![cfg_attr(feature = "std", doc = "```no_run")]
 #![cfg_attr(
     feature = "std",
@@ -130,9 +131,11 @@
 //! - Floating point (32, 64 bit, little/big endian)
 //! - Strings (UTF-8, Latin-1)
 
+mod open_data_block;
 use alloc::collections::BTreeMap;
 use alloc::string::String;
 use alloc::vec::Vec;
+pub(crate) use open_data_block::OpenDataBlock;
 
 use crate::blocks::ChannelBlock;
 
@@ -142,34 +145,12 @@ mod io;
 mod streaming;
 mod traits;
 
-use data::ChannelEncoder;
 use streaming::FlushState;
 pub use streaming::{FlushPolicy, StreamingConfig};
 pub use traits::{MdfWrite, VecWriter};
 
 #[cfg(feature = "std")]
 pub use traits::FileWriter;
-
-/// Helper structure tracking an open data block during writing.
-struct OpenDataBlock {
-    dg_id: String,
-    dt_id: String,
-    start_pos: u64,
-    record_size: usize,
-    record_count: u64,
-    /// Total number of records written across all DT blocks for this group
-    total_record_count: u64,
-    channels: Vec<ChannelBlock>,
-    dt_ids: Vec<String>,
-    dt_positions: Vec<u64>,
-    dt_sizes: Vec<u64>,
-    /// Scratch buffer reused for record encoding
-    record_buf: Vec<u8>,
-    /// Template filled with constant values used to initialise each record
-    record_template: Vec<u8>,
-    /// Precomputed per-channel encoders
-    encoders: Vec<ChannelEncoder>,
-}
 
 /// Writer for creating MDF4 files.
 ///

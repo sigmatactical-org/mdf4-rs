@@ -22,7 +22,8 @@ use crate::{
     types::DecodedValue,
 };
 
-pub(super) enum ChannelEncoder {
+/// Per-channel binary encoder chosen from the channel's data type.
+pub(crate) enum ChannelEncoder {
     UInt { offset: usize, bytes: usize },
     Int { offset: usize, bytes: usize },
     F32 { offset: usize },

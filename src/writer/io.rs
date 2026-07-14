@@ -117,6 +117,7 @@ impl<W: MdfWrite> MdfWriter<W> {
         Ok(())
     }
 
+    /// Patch a little-endian u32 at `offset` inside an already-written block.
     pub(super) fn update_block_u32(
         &mut self,
         block_id: &str,
@@ -129,6 +130,7 @@ impl<W: MdfWrite> MdfWriter<W> {
         self.update_u32(block_pos + field_offset, value)
     }
 
+    /// Patch a single byte at `offset` inside an already-written block.
     pub(super) fn update_block_u8(
         &mut self,
         block_id: &str,
@@ -141,6 +143,7 @@ impl<W: MdfWrite> MdfWriter<W> {
         self.update_u8(block_pos + field_offset, value)
     }
 
+    /// Patch a little-endian u64 at `offset` inside an already-written block.
     pub(super) fn update_block_u64(
         &mut self,
         block_id: &str,

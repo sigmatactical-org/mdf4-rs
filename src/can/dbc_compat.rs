@@ -29,6 +29,11 @@
 //! }
 //! ```
 
+mod message_info;
+mod signal_info;
+pub use message_info::MessageInfo;
+pub use signal_info::SignalInfo;
+
 use crate::DataType;
 use crate::blocks::ConversionBlock;
 
@@ -147,135 +152,6 @@ pub fn signal_to_conversion_with_range(signal: &dbc_rs::Signal) -> Option<Conver
     }
 
     Some(conv)
-}
-
-/// Information about a DBC signal for MDF4 channel creation.
-///
-/// This struct bundles all the information needed to create an MDF4 channel
-/// from a DBC signal definition.
-#[derive(Debug, Clone)]
-pub struct SignalInfo {
-    /// Signal name
-    pub name: alloc::string::String,
-    /// Physical unit (e.g., "rpm", "°C")
-    pub unit: Option<alloc::string::String>,
-    /// MDF4 data type for raw values
-    pub data_type: DataType,
-    /// Bit count for raw value storage
-    pub bit_count: u32,
-    /// Linear conversion (if needed)
-    pub conversion: Option<ConversionBlock>,
-    /// Physical minimum value
-    pub min: f64,
-    /// Physical maximum value
-    pub max: f64,
-    /// DBC factor for manual decoding
-    #[allow(dead_code)] // Used by raw_to_physical/physical_to_raw methods
-    pub factor: f64,
-    /// DBC offset for manual decoding
-    #[allow(dead_code)] // Used by raw_to_physical/physical_to_raw methods
-    pub offset: f64,
-    /// Whether the signal is unsigned
-    pub unsigned: bool,
-}
-
-impl SignalInfo {
-    /// Creates SignalInfo from a DBC signal.
-    ///
-    /// Extracts all relevant information from the signal and converts
-    /// it to MDF4-compatible formats.
-    pub fn from_signal(signal: &dbc_rs::Signal) -> Self {
-        Self {
-            name: alloc::string::String::from(signal.name()),
-            unit: signal.unit().map(alloc::string::String::from),
-            data_type: signal_to_data_type(signal),
-            bit_count: signal_to_bit_count(signal),
-            conversion: signal_to_conversion_with_range(signal),
-            min: signal.min(),
-            max: signal.max(),
-            factor: signal.factor(),
-            offset: signal.offset(),
-            unsigned: signal.is_unsigned(),
-        }
-    }
-
-    /// Check if this signal needs a conversion block.
-    #[allow(dead_code)] // Public API for library users
-    pub fn needs_conversion(&self) -> bool {
-        self.conversion.is_some()
-    }
-
-    /// Check if this is an identity conversion (factor=1, offset=0).
-    #[allow(dead_code)] // Public API for library users
-    pub fn is_identity(&self) -> bool {
-        self.factor == 1.0 && self.offset == 0.0
-    }
-
-    /// Convert a raw integer value to physical value.
-    #[allow(dead_code)] // Public API for library users
-    #[inline]
-    pub fn raw_to_physical(&self, raw: i64) -> f64 {
-        self.offset + self.factor * (raw as f64)
-    }
-
-    /// Convert a physical value to raw integer value.
-    #[allow(dead_code)] // Public API for library users
-    #[inline]
-    pub fn physical_to_raw(&self, physical: f64) -> i64 {
-        let raw = (physical - self.offset) / self.factor;
-        // Round to nearest integer (no_std compatible)
-        if raw >= 0.0 {
-            (raw + 0.5) as i64
-        } else {
-            (raw - 0.5) as i64
-        }
-    }
-}
-
-/// Information about a DBC message for MDF4 channel group creation.
-#[allow(dead_code)] // Public API for library users working with DBC message metadata
-#[derive(Debug, Clone)]
-pub struct MessageInfo {
-    /// CAN message ID
-    pub id: u32,
-    /// Message name
-    pub name: alloc::string::String,
-    /// Data length code (bytes)
-    pub dlc: u8,
-    /// Transmitting ECU name
-    pub sender: alloc::string::String,
-    /// Signal information for each signal in the message
-    pub signals: alloc::vec::Vec<SignalInfo>,
-    /// Whether this is an extended (29-bit) CAN ID
-    pub is_extended: bool,
-}
-
-#[allow(dead_code)] // Public API methods for library users
-impl MessageInfo {
-    /// Creates MessageInfo from a DBC message.
-    pub fn from_message(message: &dbc_rs::Message) -> Self {
-        let id = message.id();
-        let is_extended = (id & 0x8000_0000) != 0;
-        let raw_id = if is_extended { id & 0x1FFF_FFFF } else { id };
-
-        Self {
-            id: raw_id,
-            name: alloc::string::String::from(message.name()),
-            dlc: message.dlc(),
-            sender: alloc::string::String::from(message.sender()),
-            signals: message
-                .signals()
-                .iter()
-                .map(SignalInfo::from_signal)
-                .collect(),
-            is_extended,
-        }
-    }
-
-    /// Get the number of signals in this message.
-    pub fn signal_count(&self) -> usize {
-        self.signals.len()
-    }
 }
 
 /// Extract all message information from a DBC database.

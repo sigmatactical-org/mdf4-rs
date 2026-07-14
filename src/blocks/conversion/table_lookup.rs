@@ -39,6 +39,7 @@ pub fn lookup_table(values: &[f64], raw: f64, interp: bool) -> Option<f64> {
     None
 }
 
+/// Apply a value-to-value table conversion, with/without interpolation.
 pub fn apply_table_lookup(
     block: &ConversionBlock,
     value: DecodedValue,
@@ -52,6 +53,7 @@ pub fn apply_table_lookup(
     }
 }
 
+/// Apply a range-to-value table conversion.
 pub fn apply_range_lookup(block: &ConversionBlock, value: DecodedValue) -> Result<DecodedValue> {
     if let Some(raw) = extract_numeric(&value) {
         let inclusive_upper = matches!(

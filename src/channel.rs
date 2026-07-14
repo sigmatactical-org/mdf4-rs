@@ -1,3 +1,6 @@
+mod channel_values_iter;
+pub use channel_values_iter::ChannelValuesIter;
+
 use crate::{
     Result,
     blocks::{ChannelBlock, read_string_block},
@@ -150,53 +153,6 @@ impl<'a> Channel<'a> {
             mmap: self.mmap,
             record_id_size,
             cg_data_bytes,
-        })
-    }
-}
-
-/// Streaming iterator over decoded channel values.
-///
-/// Created by [`Channel::iter_values()`]. This iterator decodes values on-demand
-/// without loading all data into memory, making it suitable for large MDF4 files.
-pub struct ChannelValuesIter<'a> {
-    records_iter: Box<dyn Iterator<Item = Result<&'a [u8]>> + 'a>,
-    block: &'a ChannelBlock,
-    mmap: &'a [u8],
-    record_id_size: usize,
-    cg_data_bytes: u32,
-}
-
-impl<'a> Iterator for ChannelValuesIter<'a> {
-    type Item = Result<Option<DecodedValue>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let rec_result = self.records_iter.next()?;
-
-        Some(match rec_result {
-            Ok(rec) => {
-                // Decode with validity checking
-                if let Some(decoded) = decode_channel_value_with_validity(
-                    rec,
-                    self.record_id_size,
-                    self.cg_data_bytes,
-                    self.block,
-                ) {
-                    if decoded.is_valid {
-                        // Value is valid, apply conversion
-                        match self.block.apply_conversion_value(decoded.value, self.mmap) {
-                            Ok(phys) => Ok(Some(phys)),
-                            Err(e) => Err(e),
-                        }
-                    } else {
-                        // Value is invalid according to invalidation bit
-                        Ok(None)
-                    }
-                } else {
-                    // Decoding failed
-                    Ok(None)
-                }
-            }
-            Err(e) => Err(e),
         })
     }
 }

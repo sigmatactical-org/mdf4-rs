@@ -35,103 +35,16 @@
 //! let mdf_bytes = logger.finalize()?;
 //! ```
 
+mod frame_size;
+mod raw_eth_frame;
+pub(crate) use frame_size::FrameSize;
+pub(crate) use raw_eth_frame::RawEthFrame;
+
 use alloc::string::String;
 use alloc::vec::Vec;
 
-use super::frame::{
-    ETH_HEADER_SIZE, EthernetFlags, EthernetFrame, MAX_ETHERNET_FRAME, MAX_JUMBO_PAYLOAD,
-    MacAddress,
-};
-use crate::bus_logging::{BusLoggerConfig, init_bus_channel_group, timestamp_to_seconds};
-
-/// Frame size classification for ASAM channel grouping.
-#[derive(Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-enum FrameSize {
-    /// Standard Ethernet frame (up to 1514 bytes)
-    Standard,
-    /// Jumbo frame (> 1514 bytes, up to ~9000 bytes)
-    Jumbo,
-}
-
-impl FrameSize {
-    /// All frame size variants for zero-allocation iteration.
-    const ALL: [Self; 2] = [Self::Standard, Self::Jumbo];
-
-    fn group_name(&self, source_name: &str) -> String {
-        match self {
-            FrameSize::Standard => alloc::format!("{}_ETH_Frame", source_name),
-            FrameSize::Jumbo => alloc::format!("{}_ETH_Frame_Jumbo", source_name),
-        }
-    }
-
-    fn max_frame_size(&self) -> usize {
-        match self {
-            FrameSize::Standard => MAX_ETHERNET_FRAME,
-            FrameSize::Jumbo => ETH_HEADER_SIZE + MAX_JUMBO_PAYLOAD,
-        }
-    }
-
-    fn from_length(len: usize) -> Self {
-        if len > MAX_ETHERNET_FRAME {
-            FrameSize::Jumbo
-        } else {
-            FrameSize::Standard
-        }
-    }
-}
-
-/// A buffered raw Ethernet frame with timestamp.
-#[derive(Clone)]
-struct RawEthFrame {
-    /// Timestamp in seconds (ASAM uses float64 seconds)
-    timestamp_s: f64,
-    /// Frame data (complete Ethernet frame including header)
-    data: Vec<u8>,
-    /// Frame flags
-    flags: EthernetFlags,
-}
-
-impl RawEthFrame {
-    fn new(timestamp_us: u64, data: Vec<u8>, flags: EthernetFlags) -> Self {
-        Self {
-            timestamp_s: timestamp_to_seconds(timestamp_us),
-            data,
-            flags,
-        }
-    }
-
-    fn frame_size(&self) -> FrameSize {
-        FrameSize::from_length(self.data.len())
-    }
-
-    /// Build the ETH_Frame ByteArray in ASAM format.
-    ///
-    /// Format:
-    /// - Byte 0: Flags (direction, FCS valid, etc.)
-    /// - Bytes 1-2: Frame length (little-endian)
-    /// - Bytes 3+: Frame data (Dst MAC + Src MAC + EtherType + Payload)
-    fn to_frame_bytes(&self, max_size: usize) -> Vec<u8> {
-        // ASAM format: flags(1) + length(2) + frame data
-        let header_size = 3;
-        let total_size = header_size + max_size;
-
-        let mut bytes = Vec::with_capacity(total_size);
-
-        // Flags byte
-        bytes.push(self.flags.to_byte());
-
-        // Frame length (little-endian u16)
-        let frame_len = self.data.len() as u16;
-        bytes.extend_from_slice(&frame_len.to_le_bytes());
-
-        // Frame data (padded to max_size)
-        let copy_len = self.data.len().min(max_size);
-        bytes.extend_from_slice(&self.data[..copy_len]);
-        bytes.resize(total_size, 0);
-
-        bytes
-    }
-}
+use super::frame::{ETH_HEADER_SIZE, EthernetFlags, EthernetFrame, MacAddress};
+use crate::bus_logging::{BusLoggerConfig, init_bus_channel_group};
 
 /// Raw Ethernet frame logger using ASAM MDF4 Bus Logging format.
 ///
@@ -473,6 +386,7 @@ impl<W: crate::writer::MdfWrite> RawEthernetLogger<W> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ethernet::frame::MAX_ETHERNET_FRAME;
     use crate::ethernet::frame::ethertype;
 
     fn create_test_frame(payload_len: usize) -> Vec<u8> {

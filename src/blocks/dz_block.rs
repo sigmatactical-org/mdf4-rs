@@ -3,6 +3,9 @@
 //! The DZ block contains zlib-compressed data that represents another block type
 //! (typically DT or SD). Decompression requires the `compression` feature.
 
+mod dz_compression_type;
+pub use dz_compression_type::DzCompressionType;
+
 use crate::{
     Error, Result,
     blocks::common::{BlockHeader, BlockParse, read_u8, read_u32, read_u64, validate_buffer_size},
@@ -10,26 +13,6 @@ use crate::{
 use alloc::string::ToString;
 use alloc::vec;
 use alloc::vec::Vec;
-
-/// Compression algorithm used in DZ block.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum DzCompressionType {
-    /// Deflate only (zlib).
-    Deflate = 0,
-    /// Transposition followed by deflate.
-    TranspositionDeflate = 1,
-}
-
-impl DzCompressionType {
-    /// Convert from raw u8 value.
-    pub fn from_u8(value: u8) -> Option<Self> {
-        match value {
-            0 => Some(Self::Deflate),
-            1 => Some(Self::TranspositionDeflate),
-            _ => None,
-        }
-    }
-}
 
 /// DZ Block - Zlib compressed data block.
 ///

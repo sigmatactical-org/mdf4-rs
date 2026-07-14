@@ -5,6 +5,7 @@ use crate::types::DecodedValue;
 use alloc::format;
 use alloc::vec::Vec;
 
+/// Apply a bitfield text-table conversion (CC type 10).
 pub fn apply_bitfield_text(
     block: &ConversionBlock,
     value: DecodedValue,

@@ -3,6 +3,13 @@
 //! This module defines the LIN frame structure according to
 //! the ASAM MDF4 Bus Logging specification.
 
+mod checksum_type;
+mod lin_flags;
+mod schedule_entry_type;
+pub use checksum_type::ChecksumType;
+pub use lin_flags::LinFlags;
+pub use schedule_entry_type::ScheduleEntryType;
+
 use alloc::vec::Vec;
 
 use crate::bus_logging::BusFrame;
@@ -12,144 +19,6 @@ pub const MAX_LIN_DATA_LEN: usize = 8;
 
 /// LIN frame ID range (0-63, 6 bits).
 pub const MAX_LIN_ID: u8 = 63;
-
-/// LIN checksum type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[repr(u8)]
-pub enum ChecksumType {
-    /// Classic checksum (LIN 1.x) - sum of data bytes only.
-    #[default]
-    Classic = 0,
-    /// Enhanced checksum (LIN 2.x) - sum of ID and data bytes.
-    Enhanced = 1,
-}
-
-impl ChecksumType {
-    /// Create from raw byte value.
-    pub fn from_u8(value: u8) -> Self {
-        match value {
-            1 => Self::Enhanced,
-            _ => Self::Classic,
-        }
-    }
-}
-
-/// LIN frame flags for ASAM MDF4 Bus Logging.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct LinFlags(u8);
-
-impl LinFlags {
-    /// Bit 0: Frame direction (0 = Rx, 1 = Tx).
-    pub const TX: u8 = 0x01;
-    /// Bit 1: Wake-up signal.
-    pub const WAKEUP: u8 = 0x02;
-    /// Bit 2: Checksum error.
-    pub const CHECKSUM_ERROR: u8 = 0x04;
-    /// Bit 3: No response (slave didn't respond).
-    pub const NO_RESPONSE: u8 = 0x08;
-    /// Bit 4: Sync error.
-    pub const SYNC_ERROR: u8 = 0x10;
-    /// Bit 5: Framing error.
-    pub const FRAMING_ERROR: u8 = 0x20;
-    /// Bit 6: Short response (incomplete data).
-    pub const SHORT_RESPONSE: u8 = 0x40;
-    /// Bit 7: Enhanced checksum used (LIN 2.x).
-    pub const ENHANCED_CHECKSUM: u8 = 0x80;
-
-    /// Create flags from raw byte.
-    pub fn from_byte(value: u8) -> Self {
-        Self(value)
-    }
-
-    /// Get raw byte value.
-    pub fn to_byte(self) -> u8 {
-        self.0
-    }
-
-    /// Create flags for received frame.
-    pub fn rx() -> Self {
-        Self(0)
-    }
-
-    /// Create flags for transmitted frame.
-    pub fn tx() -> Self {
-        Self(Self::TX)
-    }
-
-    /// Check if this is a transmitted frame.
-    pub fn is_tx(self) -> bool {
-        self.0 & Self::TX != 0
-    }
-
-    /// Check if this is a received frame.
-    pub fn is_rx(self) -> bool {
-        !self.is_tx()
-    }
-
-    /// Check if this is a wake-up frame.
-    pub fn is_wakeup(self) -> bool {
-        self.0 & Self::WAKEUP != 0
-    }
-
-    /// Check if checksum error occurred.
-    pub fn has_checksum_error(self) -> bool {
-        self.0 & Self::CHECKSUM_ERROR != 0
-    }
-
-    /// Check if slave didn't respond.
-    pub fn has_no_response(self) -> bool {
-        self.0 & Self::NO_RESPONSE != 0
-    }
-
-    /// Check if sync error occurred.
-    pub fn has_sync_error(self) -> bool {
-        self.0 & Self::SYNC_ERROR != 0
-    }
-
-    /// Check if framing error occurred.
-    pub fn has_framing_error(self) -> bool {
-        self.0 & Self::FRAMING_ERROR != 0
-    }
-
-    /// Check if response was incomplete.
-    pub fn has_short_response(self) -> bool {
-        self.0 & Self::SHORT_RESPONSE != 0
-    }
-
-    /// Check if enhanced (LIN 2.x) checksum is used.
-    pub fn uses_enhanced_checksum(self) -> bool {
-        self.0 & Self::ENHANCED_CHECKSUM != 0
-    }
-
-    /// Check if any error occurred.
-    pub fn has_error(self) -> bool {
-        self.0
-            & (Self::CHECKSUM_ERROR
-                | Self::NO_RESPONSE
-                | Self::SYNC_ERROR
-                | Self::FRAMING_ERROR
-                | Self::SHORT_RESPONSE)
-            != 0
-    }
-
-    /// Set the transmit flag.
-    pub fn with_tx(self, tx: bool) -> Self {
-        if tx {
-            Self(self.0 | Self::TX)
-        } else {
-            Self(self.0 & !Self::TX)
-        }
-    }
-
-    /// Set the enhanced checksum flag.
-    pub fn with_enhanced_checksum(self, enhanced: bool) -> Self {
-        if enhanced {
-            Self(self.0 | Self::ENHANCED_CHECKSUM)
-        } else {
-            Self(self.0 & !Self::ENHANCED_CHECKSUM)
-        }
-    }
-}
 
 /// A LIN frame for ASAM MDF4 Bus Logging.
 ///
@@ -311,22 +180,6 @@ impl BusFrame for LinFrame {
     fn mdf_size(&self) -> usize {
         12 // Fixed size: ID + Length + Flags + Checksum + Data(8)
     }
-}
-
-/// LIN schedule table entry type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum ScheduleEntryType {
-    /// Unconditional frame.
-    Unconditional = 0,
-    /// Event-triggered frame.
-    EventTriggered = 1,
-    /// Sporadic frame.
-    Sporadic = 2,
-    /// Diagnostic request (Master Request Frame).
-    DiagnosticRequest = 3,
-    /// Diagnostic response (Slave Response Frame).
-    DiagnosticResponse = 4,
 }
 
 #[cfg(test)]

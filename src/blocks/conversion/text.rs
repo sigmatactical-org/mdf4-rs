@@ -27,6 +27,7 @@ pub fn find_range_to_text_index(values: &[f64], raw: f64, inclusive_upper: bool)
     n
 }
 
+/// Apply a value-to-text conversion (CC type 7).
 pub fn apply_value_to_text(
     block: &ConversionBlock,
     value: DecodedValue,
@@ -105,6 +106,7 @@ pub fn apply_value_to_text(
     Ok(DecodedValue::Unknown)
 }
 
+/// Apply a range-to-text conversion (CC type 8).
 pub fn apply_range_to_text(
     block: &ConversionBlock,
     value: DecodedValue,
@@ -187,6 +189,7 @@ pub fn apply_range_to_text(
     Ok(DecodedValue::Unknown)
 }
 
+/// Apply a text-to-value conversion (CC type 9).
 pub fn apply_text_to_value(
     block: &ConversionBlock,
     value: DecodedValue,
@@ -241,6 +244,7 @@ pub fn apply_text_to_value(
     }
 }
 
+/// Apply a text-to-text conversion (CC type 10 legacy).
 pub fn apply_text_to_text(
     block: &ConversionBlock,
     value: DecodedValue,

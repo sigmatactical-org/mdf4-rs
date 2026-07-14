@@ -1,33 +1,19 @@
+mod channel_meta;
+mod group_meta;
+mod merged_group;
+pub(crate) use channel_meta::ChannelMeta;
+pub(crate) use group_meta::GroupMeta;
+pub(crate) use merged_group::MergedGroup;
+
 use crate::{
     Result,
-    blocks::{DataType, read_string_block},
+    blocks::read_string_block,
     parsing::{
         MdfFile,
         decoder::{DecodedValue, decode_channel_value},
     },
     writer::MdfWriter,
 };
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct ChannelMeta {
-    name: Option<String>,
-    data_type: DataType,
-    bit_offset: u8,
-    byte_offset: u32,
-    bit_count: u32,
-    channel_type: u8,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct GroupMeta {
-    record_id_size: u8,
-    channels: Vec<ChannelMeta>,
-}
-
-struct MergedGroup {
-    meta: GroupMeta,
-    data: Vec<Vec<DecodedValue>>, // per channel
-}
 
 fn collect_groups(file: &MdfFile) -> Result<Vec<MergedGroup>> {
     let mut groups = Vec::new();

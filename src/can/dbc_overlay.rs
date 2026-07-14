@@ -34,46 +34,20 @@
 //! }
 //! ```
 
+mod asam_can_group;
+mod decoded_frame;
+mod overlay_statistics;
+mod signal_value;
+pub(crate) use asam_can_group::AsamCanGroup;
+pub use decoded_frame::DecodedFrame;
+pub use overlay_statistics::OverlayStatistics;
+pub use signal_value::SignalValue;
+
 use alloc::string::String;
 use alloc::vec::Vec;
 
 use crate::index::{ByteRangeReader, IndexedChannelGroup, MdfIndex};
 use crate::{DecodedValue, Error, Result};
-
-/// A decoded CAN frame with all signal values.
-#[derive(Debug, Clone)]
-pub struct DecodedFrame {
-    /// Timestamp in microseconds
-    pub timestamp_us: u64,
-    /// CAN ID (without extended bit)
-    pub can_id: u32,
-    /// Whether this is an extended 29-bit ID
-    pub is_extended: bool,
-    /// Decoded signal values: (signal_name, physical_value)
-    pub signals: Vec<(String, f64)>,
-}
-
-/// A timestamped signal value.
-#[derive(Debug, Clone)]
-pub struct SignalValue {
-    /// Timestamp in microseconds
-    pub timestamp_us: u64,
-    /// Physical value after DBC conversion
-    pub value: f64,
-    /// Raw integer value before conversion
-    pub raw_value: i64,
-}
-
-/// Information about an ASAM CAN_DataFrame channel group.
-#[derive(Debug)]
-struct AsamCanGroup {
-    /// Index in the MdfIndex channel_groups
-    group_index: usize,
-    /// Timestamp channel index
-    timestamp_channel: usize,
-    /// CAN_DataFrame channel index (ByteArray)
-    dataframe_channel: usize,
-}
 
 /// Read-time DBC overlay reader for decoding raw CAN captures.
 ///
@@ -461,25 +435,6 @@ impl<'dbc> DbcOverlayReader<'dbc> {
 
         Ok(signals)
     }
-}
-
-/// Statistics about a raw CAN capture with DBC overlay.
-#[derive(Debug, Clone)]
-pub struct OverlayStatistics {
-    /// Total number of CAN frames in the capture
-    pub total_frames: usize,
-    /// Number of unique CAN IDs
-    pub unique_can_ids: usize,
-    /// Number of DBC messages that have data in this capture
-    pub dbc_messages_found: usize,
-    /// Total number of messages defined in the DBC
-    pub dbc_messages_total: usize,
-    /// Earliest timestamp in microseconds
-    pub min_timestamp_us: u64,
-    /// Latest timestamp in microseconds
-    pub max_timestamp_us: u64,
-    /// Duration of capture in microseconds
-    pub duration_us: u64,
 }
 
 #[cfg(test)]

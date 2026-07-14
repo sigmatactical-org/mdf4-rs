@@ -1,3 +1,8 @@
+mod bus_type;
+mod source_type;
+pub use bus_type::BusType;
+pub use source_type::SourceType;
+
 use super::SI_BLOCK_SIZE;
 #[cfg(feature = "std")]
 use crate::blocks::common::u64_to_usize;
@@ -66,48 +71,6 @@ impl BlockParse<'_> for SourceBlock {
             flags: read_u8(bytes, data_start + 2),
         })
     }
-}
-
-/// Source type constants for SourceBlock.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum SourceType {
-    /// Other source type
-    Other = 0,
-    /// Electronic Control Unit
-    ECU = 1,
-    /// Bus (CAN, LIN, etc.)
-    Bus = 2,
-    /// I/O device
-    IO = 3,
-    /// Tool
-    Tool = 4,
-    /// User-defined
-    User = 5,
-}
-
-/// Bus type constants for SourceBlock.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u8)]
-pub enum BusType {
-    /// No bus
-    None = 0,
-    /// Other bus type
-    Other = 1,
-    /// CAN bus
-    CAN = 2,
-    /// LIN bus
-    LIN = 3,
-    /// MOST bus
-    MOST = 4,
-    /// FlexRay
-    FlexRay = 5,
-    /// K-Line
-    KLine = 6,
-    /// Ethernet
-    Ethernet = 7,
-    /// USB
-    USB = 8,
 }
 
 impl SourceBlock {
