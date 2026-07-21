@@ -6,7 +6,7 @@ license = "MIT OR Apache-2.0"
 authors = ["Sigma Tactical Group contributors <https://github.com/sigmatactical-org>"]
 repository = "https://github.com/sigmatactical-org/mdf4-rs"
 homepage = "https://sigmatactical.org"
-rust-version = "1.97.0"
+rust-version = "1.97.1"
 readme = "README.md"
 description = "mdf4-rs is a Rust library for working with Measurement Data Format (ASAM MDF4) files."
 documentation = "https://docs.rs/mdf4-rs"
@@ -26,13 +26,13 @@ compression = ["dep:miniz_oxide", "alloc"]
 [dependencies]
 
 [dependencies.serde]
-version = "1.0.228"
+version = "1.0.229"
 default-features = false
 features = ["derive", "alloc"]
 optional = true
 
 [dependencies.serde_json]
-version = "1.0.150"
+version = "1.0.151"
 optional = true
 
 [dependencies.embedded-can]
@@ -54,7 +54,7 @@ optional = true
 [dev-dependencies]
 
 [dev-dependencies.serde]
-version = "1.0.228"
+version = "1.0.229"
 features = ["derive"]
 
 [dev-dependencies.embedded-can]
