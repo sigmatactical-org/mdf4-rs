@@ -123,9 +123,7 @@ jobs:
         uses: taiki-e/install-action@v2
         with:
           tool: cargo-llvm-cov
-      # Line coverage is ~73–74% (library + integration tests, src/ only via ignore
-      # regex). A previous --fail-under-lines 80 failed CI for that reason; we
-      # report totals only, no gate.
+      # Require both executable line and region coverage to stay above 80%.
       - name: Code coverage (report summary)
         run: |
           set -euo pipefail
@@ -133,6 +131,8 @@ jobs:
             --all-features \
             --tests \
             --lib \
+            --fail-under-lines 80 \
+            --fail-under-regions 80 \
             --ignore-filename-regex "^(tests|examples|benches)/" \
             --json --summary-only \
             --output-path coverage-summary.json

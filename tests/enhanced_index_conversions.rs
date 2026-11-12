@@ -262,6 +262,7 @@ fn test_index_serialization_with_resolved_data() -> Result<()> {
         bit_offset: 0,
         bit_count: 32,
         channel_type: 0,
+        component_addr: 0,
         flags: 0,
         pos_invalidation_bit: 0,
         conversion: Some(conversion),
@@ -305,4 +306,24 @@ fn test_index_serialization_with_resolved_data() -> Result<()> {
     fs::remove_file(temp_index_path)?;
 
     Ok(())
+}
+
+#[test]
+fn older_serialized_channels_default_component_address() {
+    let channel: IndexedChannel = serde_json::from_value(serde_json::json!({
+        "name": "Legacy",
+        "unit": null,
+        "data_type": "UnsignedIntegerLE",
+        "byte_offset": 0,
+        "bit_offset": 0,
+        "bit_count": 8,
+        "channel_type": 0,
+        "flags": 0,
+        "pos_invalidation_bit": 0,
+        "conversion": null,
+        "vlsd_data_address": null
+    }))
+    .unwrap();
+
+    assert_eq!(channel.component_addr, 0);
 }

@@ -77,6 +77,8 @@ mod data_block_info;
 mod file_range_reader;
 mod indexed_channel;
 mod indexed_channel_group;
+mod recovered;
+mod time_range;
 pub use _http_range_reader_example::_HttpRangeReaderExample;
 pub use buffered_range_reader::BufferedRangeReader;
 pub use byte_range_reader::ByteRangeReader;
@@ -84,6 +86,8 @@ pub use data_block_info::DataBlockInfo;
 pub use file_range_reader::FileRangeReader;
 pub use indexed_channel::IndexedChannel;
 pub use indexed_channel_group::IndexedChannelGroup;
+pub use recovered::RecoveredMdfIndex;
+pub use time_range::TimeRangeData;
 
 #[cfg(feature = "compression")]
 use crate::blocks::DzBlock;
@@ -96,7 +100,7 @@ use crate::{
     },
     parsing::decoder::{DecodedValue, decode_channel_value_with_validity},
 };
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Complete index of an MDF file for efficient random access.
 ///
@@ -180,6 +184,7 @@ impl MdfIndex {
                     bit_offset: block.bit_offset,
                     bit_count: block.bit_count,
                     channel_type: block.channel_type,
+                    component_addr: block.component_addr,
                     flags: block.flags,
                     pos_invalidation_bit: block.pos_invalidation_bit,
                     conversion: resolved_conversion,
@@ -259,14 +264,22 @@ impl MdfIndex {
 
         // Follow the DG chain
         let mut dg_addr = header.first_dg_addr;
+        let mut seen_data_groups = BTreeSet::new();
         while dg_addr != 0 {
+            if !seen_data_groups.insert(dg_addr) {
+                return Err(Error::LinkCycle { address: dg_addr });
+            }
             // Read DG block (64 bytes)
             let dg_bytes = reader.read_range(dg_addr, 64)?;
             let dg_block = DataGroupBlock::from_bytes(&dg_bytes)?;
 
             // Follow the CG chain within this DG
             let mut cg_addr = dg_block.first_cg_addr;
+            let mut seen_channel_groups = BTreeSet::new();
             while cg_addr != 0 {
+                if !seen_channel_groups.insert(cg_addr) {
+                    return Err(Error::LinkCycle { address: cg_addr });
+                }
                 // Read CG block (104 bytes)
                 let cg_bytes = reader.read_range(cg_addr, 104)?;
                 let cg_block = ChannelGroupBlock::from_bytes(&cg_bytes)?;
@@ -278,7 +291,11 @@ impl MdfIndex {
                 // Follow the CN chain within this CG
                 let mut indexed_channels = Vec::new();
                 let mut cn_addr = cg_block.first_ch_addr;
+                let mut seen_channels = BTreeSet::new();
                 while cn_addr != 0 {
+                    if !seen_channels.insert(cn_addr) {
+                        return Err(Error::LinkCycle { address: cn_addr });
+                    }
                     // Read CN block (160 bytes)
                     let cn_bytes = reader.read_range(cn_addr, 160)?;
                     let cn_block = ChannelBlock::from_bytes(&cn_bytes)?;
@@ -301,6 +318,7 @@ impl MdfIndex {
                         bit_offset: cn_block.bit_offset,
                         bit_count: cn_block.bit_count,
                         channel_type: cn_block.channel_type,
+                        component_addr: cn_block.component_addr,
                         flags: cn_block.flags,
                         pos_invalidation_bit: cn_block.pos_invalidation_bit,
                         conversion,
@@ -410,16 +428,18 @@ impl MdfIndex {
                 let mut resolved = BTreeMap::new();
                 for (idx, &ref_addr) in conv.refs.iter().enumerate() {
                     if ref_addr != 0 {
-                        // Check if this is a text block or nested conversion
                         let header_bytes = reader.read_range(ref_addr, 24)?;
                         let header = BlockHeader::from_bytes(&header_bytes)?;
 
-                        if header.id == "##TX" || header.id == "##MD" {
-                            if let Ok(Some(text)) = Self::read_text_block(reader, ref_addr) {
+                        if header.id == "##TX" {
+                            if let Some(text) = Self::read_text_block(reader, ref_addr)? {
                                 resolved.insert(idx, text);
                             }
+                        } else if header.id == "##CC" {
+                            return Err(Error::BlockSerializationError(
+                                "Streaming index does not support nested conversions".to_string(),
+                            ));
                         }
-                        // Skip nested conversions for now - they're complex
                     }
                 }
                 if !resolved.is_empty() {
@@ -440,8 +460,14 @@ impl MdfIndex {
     ) -> Result<Vec<DataBlockInfo>> {
         let mut data_blocks = Vec::new();
         let mut current_addr = data_addr;
+        let mut seen = BTreeSet::new();
 
         while current_addr != 0 {
+            if !seen.insert(current_addr) {
+                return Err(Error::LinkCycle {
+                    address: current_addr,
+                });
+            }
             // Read block header (24 bytes)
             let header_bytes = reader.read_range(current_addr, 24)?;
             let header = BlockHeader::from_bytes(&header_bytes)?;
@@ -474,10 +500,20 @@ impl MdfIndex {
                             continue;
                         }
                         let mut frag_pos = fragment_addr;
+                        let mut seen_fragments = BTreeSet::new();
                         loop {
+                            if !seen_fragments.insert(frag_pos) {
+                                return Err(Error::LinkCycle { address: frag_pos });
+                            }
                             let frag_hdr_bytes = reader.read_range(frag_pos, 24)?;
                             let frag_hdr = BlockHeader::from_bytes(&frag_hdr_bytes)?;
                             if frag_hdr.id.as_str() != "##HL" {
+                                if !matches!(frag_hdr.id.as_str(), "##DT" | "##DV" | "##DZ") {
+                                    return Err(Error::BlockIDError {
+                                        actual: frag_hdr.id,
+                                        expected: "##DT / ##DV / ##DZ".to_string(),
+                                    });
+                                }
                                 data_blocks.push(DataBlockInfo {
                                     file_offset: frag_pos,
                                     size: frag_hdr.length,
@@ -497,8 +533,10 @@ impl MdfIndex {
                     current_addr = HlBlock::next_block_addr(&hl_bytes)?;
                 }
                 _ => {
-                    // Unknown block type, stop
-                    current_addr = 0;
+                    return Err(Error::BlockIDError {
+                        actual: header.id,
+                        expected: "##DT / ##DV / ##DZ / ##DL / ##HL".to_string(),
+                    });
                 }
             }
         }
@@ -654,10 +692,22 @@ impl MdfIndex {
         reader: &mut R,
     ) -> Result<Vec<Option<DecodedValue>>> {
         // Record structure: record_id + data_bytes + invalidation_bytes
-        let record_size = group.record_id_size as usize
-            + group.record_size as usize
-            + group.invalidation_bytes as usize;
+        if group.record_id_size != 0 {
+            return Err(Error::BlockSerializationError(
+                "Indexed channel reads do not support record IDs".to_string(),
+            ));
+        }
+        let record_size = usize::try_from(group.record_size)
+            .ok()
+            .and_then(|size| size.checked_add(group.invalidation_bytes as usize))
+            .ok_or_else(|| Error::BlockSerializationError("Record size overflows".to_string()))?;
+        if record_size == 0 {
+            return Err(Error::BlockSerializationError(
+                "Empty record size".to_string(),
+            ));
+        }
         let mut values = Vec::new();
+        let mut pending = Vec::new();
 
         // Read from each data block
         for data_block in &group.data_blocks {
@@ -678,16 +728,29 @@ impl MdfIndex {
                 }
             } else {
                 // Read the block data (skip 24-byte block header)
-                reader.read_range(data_block.file_offset + 24, data_block.size - 24)?
+                let offset = data_block.file_offset.checked_add(24).ok_or_else(|| {
+                    Error::BlockSerializationError("Data block offset overflows".to_string())
+                })?;
+                let length = data_block.size.checked_sub(24).ok_or_else(|| {
+                    Error::BlockSerializationError(
+                        "Data block is shorter than its header".to_string(),
+                    )
+                })?;
+                reader.read_range(offset, length)?
             };
 
-            // Process records in this block
-            let record_count = block_data.len() / record_size;
-            for i in 0..record_count {
-                let record_start = i * record_size;
-                let record_end = record_start + record_size;
-                let record = &block_data[record_start..record_end];
-
+            let mut remaining = block_data.as_slice();
+            if !pending.is_empty() {
+                let needed = (record_size - pending.len()).min(remaining.len());
+                pending.extend_from_slice(&remaining[..needed]);
+                remaining = &remaining[needed..];
+            }
+            let remainder = &remaining[remaining.len() - remaining.len() % record_size..];
+            let records = (pending.len() == record_size)
+                .then_some(pending.as_slice())
+                .into_iter()
+                .chain(remaining.chunks_exact(record_size));
+            for record in records {
                 // Create a ChannelBlock for decoding
                 let temp_channel_block = ChannelBlock {
                     header: BlockHeader {
@@ -728,7 +791,7 @@ impl MdfIndex {
                 // Decode with validity checking
                 if let Some(decoded) = decode_channel_value_with_validity(
                     record,
-                    group.record_id_size as usize,
+                    0,
                     group.record_size,
                     &temp_channel_block,
                 ) {
@@ -749,6 +812,10 @@ impl MdfIndex {
                     values.push(None);
                 }
             }
+            if pending.len() == record_size {
+                pending.clear();
+            }
+            pending.extend_from_slice(remainder);
         }
 
         Ok(values)
@@ -1381,5 +1448,148 @@ impl MdfIndex {
         let (group_index, channel_index) = self.find_channel_by_name_global(channel_name)?;
         let channel = self.get_channel_info(group_index, channel_index)?;
         Some((group_index, channel_index, channel))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct SliceReader {
+        bytes: Vec<u8>,
+    }
+
+    impl ByteRangeReader for SliceReader {
+        type Error = Error;
+
+        fn read_range(&mut self, offset: u64, length: u64) -> Result<Vec<u8>> {
+            let start = usize::try_from(offset).map_err(|_| {
+                Error::BlockSerializationError("Test reader offset does not fit usize".to_string())
+            })?;
+            let length = usize::try_from(length).map_err(|_| {
+                Error::BlockSerializationError("Test reader length does not fit usize".to_string())
+            })?;
+            let end = start.checked_add(length).ok_or_else(|| {
+                Error::BlockSerializationError("Test reader range overflows".to_string())
+            })?;
+            self.bytes
+                .get(start..end)
+                .map(<[u8]>::to_vec)
+                .ok_or(Error::TooShortBuffer {
+                    actual: self.bytes.len().saturating_sub(start),
+                    expected: length,
+                    file: file!(),
+                    line: line!(),
+                })
+        }
+    }
+
+    fn test_index(record_id_size: u8, data_blocks: Vec<DataBlockInfo>) -> MdfIndex {
+        MdfIndex {
+            file_size: 0,
+            channel_groups: vec![IndexedChannelGroup {
+                name: None,
+                comment: None,
+                record_id_size,
+                record_size: 2,
+                invalidation_bytes: 0,
+                record_count: 0,
+                channels: vec![IndexedChannel {
+                    name: None,
+                    unit: None,
+                    data_type: DataType::UnsignedIntegerLE,
+                    byte_offset: 0,
+                    bit_offset: 0,
+                    bit_count: 8,
+                    channel_type: 0,
+                    component_addr: 0,
+                    flags: 0,
+                    pos_invalidation_bit: 0,
+                    conversion: None,
+                    vlsd_data_address: None,
+                }],
+                data_blocks,
+            }],
+        }
+    }
+
+    #[test]
+    fn reads_records_split_across_data_blocks() {
+        let index = test_index(
+            0,
+            vec![
+                DataBlockInfo {
+                    file_offset: 0,
+                    size: 25,
+                    is_compressed: false,
+                },
+                DataBlockInfo {
+                    file_offset: 25,
+                    size: 27,
+                    is_compressed: false,
+                },
+            ],
+        );
+        let mut bytes = vec![0; 52];
+        bytes[24] = 7;
+        bytes[49..52].copy_from_slice(&[9, 11, 13]);
+        let mut reader = SliceReader { bytes };
+
+        let values = index.read_channel_values(0, 0, &mut reader).unwrap();
+        assert_eq!(
+            values,
+            vec![
+                Some(DecodedValue::UnsignedInteger(7)),
+                Some(DecodedValue::UnsignedInteger(11)),
+            ]
+        );
+    }
+
+    #[test]
+    fn rejects_record_id_groups_for_channel_reads() {
+        let index = test_index(1, Vec::new());
+        let mut reader = SliceReader { bytes: Vec::new() };
+
+        assert!(index.read_channel_values(0, 0, &mut reader).is_err());
+    }
+
+    #[test]
+    fn detects_data_list_cycles() {
+        let mut data_list = DataListBlock::new_equal_length(Vec::new(), 0);
+        data_list.next_dl_addr = 24;
+        let mut bytes = vec![0; 24];
+        bytes.extend_from_slice(&data_list.to_bytes().unwrap());
+        let mut reader = SliceReader { bytes };
+
+        assert!(matches!(
+            MdfIndex::extract_data_blocks_streaming(&mut reader, 24),
+            Err(Error::LinkCycle { address: 24 })
+        ));
+    }
+
+    #[test]
+    fn range_readers_reject_offset_overflow() {
+        let unique = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "mdf4-rs-range-read-{}-{unique}.tmp",
+            std::process::id()
+        ));
+        std::fs::write(&path, [0]).unwrap();
+
+        let mut file_reader = FileRangeReader::new(path.to_str().unwrap()).unwrap();
+        let mut buffered_reader = BufferedRangeReader::new(path.to_str().unwrap()).unwrap();
+        assert!(matches!(
+            file_reader.read_range(u64::MAX, 1),
+            Err(Error::BlockSerializationError(_))
+        ));
+        assert!(matches!(
+            buffered_reader.read_range(u64::MAX, 1),
+            Err(Error::BlockSerializationError(_))
+        ));
+
+        std::fs::remove_file(path).unwrap();
     }
 }

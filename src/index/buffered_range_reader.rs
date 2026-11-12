@@ -46,7 +46,9 @@ impl BufferedRangeReader {
         let bytes_read = self.file.read(&mut self.buffer).map_err(Error::IOError)?;
         self.buffer.truncate(bytes_read);
         self.buffer_start = offset;
-        self.buffer_end = offset + bytes_read as u64;
+        self.buffer_end = offset
+            .checked_add(bytes_read as u64)
+            .ok_or_else(|| Error::BlockSerializationError("Buffer range overflows".to_string()))?;
 
         Ok(())
     }
@@ -59,21 +61,26 @@ impl ByteRangeReader for BufferedRangeReader {
         offset: u64,
         length: u64,
     ) -> core::result::Result<Vec<u8>, Self::Error> {
-        let end = offset + length;
+        let end = offset
+            .checked_add(length)
+            .ok_or_else(|| Error::BlockSerializationError("Byte range overflows".to_string()))?;
+        let length = usize::try_from(length).map_err(|_| {
+            Error::BlockSerializationError("Byte range length does not fit usize".to_string())
+        })?;
 
         // Check if the requested range is fully within the buffer
         if offset >= self.buffer_start && end <= self.buffer_end {
             let start_idx = (offset - self.buffer_start) as usize;
-            let end_idx = start_idx + length as usize;
+            let end_idx = start_idx + length;
             return Ok(self.buffer[start_idx..end_idx].to_vec());
         }
 
         // If the request is larger than our buffer, read directly
-        if length as usize > self.buffer_capacity {
+        if length > self.buffer_capacity {
             self.file
                 .seek(SeekFrom::Start(offset))
                 .map_err(Error::IOError)?;
-            let mut buffer = vec![0u8; length as usize];
+            let mut buffer = vec![0u8; length];
             self.file.read_exact(&mut buffer).map_err(Error::IOError)?;
             return Ok(buffer);
         }
@@ -84,13 +91,13 @@ impl ByteRangeReader for BufferedRangeReader {
         // Now read from buffer
         if end <= self.buffer_end {
             let start_idx = (offset - self.buffer_start) as usize;
-            let end_idx = start_idx + length as usize;
+            let end_idx = start_idx + length;
             Ok(self.buffer[start_idx..end_idx].to_vec())
         } else {
             // Buffer didn't have enough data (near end of file)
             Err(Error::TooShortBuffer {
                 actual: (self.buffer_end - offset) as usize,
-                expected: length as usize,
+                expected: length,
                 file: file!(),
                 line: line!(),
             })

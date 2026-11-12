@@ -14,3 +14,24 @@ pub trait BusFrame: Clone {
         self.to_mdf_bytes().len()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::BusFrame;
+    use alloc::vec;
+    use alloc::vec::Vec;
+
+    #[derive(Clone)]
+    struct Frame(Vec<u8>);
+
+    impl BusFrame for Frame {
+        fn to_mdf_bytes(&self) -> Vec<u8> {
+            self.0.clone()
+        }
+    }
+
+    #[test]
+    fn default_size_matches_serialized_frame_length() {
+        assert_eq!(Frame(vec![1, 2, 3]).mdf_size(), 3);
+    }
+}

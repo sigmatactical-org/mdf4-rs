@@ -15,3 +15,6 @@ mod test_deep_chains;
 
 #[cfg(test)]
 mod simple_test;
+
+#[cfg(test)]
+mod test_tables;

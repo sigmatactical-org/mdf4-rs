@@ -200,3 +200,80 @@ impl From<std::io::Error> for Error {
 ///
 /// This is defined as `core::result::Result<T, Error>` for convenience.
 pub type Result<T> = core::result::Result<T, Error>;
+
+#[cfg(all(test, feature = "std"))]
+mod tests {
+    use super::Error;
+
+    #[test]
+    fn displays_each_error_variant() {
+        let cases = [
+            (
+                Error::TooShortBuffer {
+                    actual: 1,
+                    expected: 2,
+                    file: "sample",
+                    line: 7,
+                },
+                "Buffer too small at sample:7: need at least 2 bytes, got 1",
+            ),
+            (
+                Error::FileIdentifierError("bad".into()),
+                "Invalid file identifier: Expected \"MDF     \", found bad",
+            ),
+            (
+                Error::FileVersioningError("4.0".into()),
+                "File version too low: Expected \"> 4.1\", found 4.0",
+            ),
+            (
+                Error::BlockIDError {
+                    actual: "##XX".into(),
+                    expected: "##HD".into(),
+                },
+                "Invalid block identifier: Expected \"##HD\", got \"##XX\"",
+            ),
+            (
+                Error::IOError(std::io::Error::other("disk")),
+                "I/O error: disk",
+            ),
+            (
+                Error::InvalidVersionString("bad".into()),
+                "Invalid version string: bad",
+            ),
+            (
+                Error::BlockLinkError("missing".into()),
+                "Block linking error: missing",
+            ),
+            (
+                Error::BlockSerializationError("invalid".into()),
+                "Block serialization error: invalid",
+            ),
+            (
+                Error::ConversionChainTooDeep { max_depth: 20 },
+                "Conversion chain too deep: maximum depth of 20 exceeded",
+            ),
+            (
+                Error::ConversionChainCycle { address: 16 },
+                "Conversion chain cycle detected at block address 0x10",
+            ),
+            (
+                Error::LinkCycle { address: 32 },
+                "Block link cycle detected at address 0x20",
+            ),
+        ];
+
+        for (error, expected) in cases {
+            assert_eq!(error.to_string(), expected);
+        }
+    }
+
+    #[test]
+    fn exposes_only_io_errors_as_sources_and_converts_io_errors() {
+        let io_error = std::io::Error::other("disk");
+        let error = Error::from(io_error);
+        assert!(std::error::Error::source(&error).is_some());
+
+        let parse_error = Error::BlockSerializationError("invalid".into());
+        assert!(std::error::Error::source(&parse_error).is_none());
+    }
+}

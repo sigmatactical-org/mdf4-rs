@@ -85,3 +85,55 @@ impl core::fmt::Display for DecodedValue {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::DecodedValue;
+
+    #[test]
+    fn identifies_value_categories_and_numeric_values() {
+        let unsigned = DecodedValue::UnsignedInteger(5);
+        let signed = DecodedValue::SignedInteger(-2);
+        let float = DecodedValue::Float(1.5);
+        let text = DecodedValue::String("sample".into());
+        let bytes = DecodedValue::ByteArray(vec![1, 2]);
+        let mime_sample = DecodedValue::MimeSample(vec![1]);
+        let mime_stream = DecodedValue::MimeStream(vec![1, 2, 3]);
+        let unknown = DecodedValue::Unknown;
+
+        assert!(unsigned.is_integer());
+        assert!(signed.is_integer());
+        assert!(float.is_float());
+        assert!(text.is_string());
+        assert!(bytes.is_bytes());
+        assert!(mime_sample.is_bytes());
+        assert!(mime_stream.is_bytes());
+        assert!(!unknown.is_integer());
+        assert!(!unknown.is_float());
+        assert!(!unknown.is_string());
+        assert!(!unknown.is_bytes());
+        assert_eq!(unsigned.as_f64(), Some(5.0));
+        assert_eq!(signed.as_f64(), Some(-2.0));
+        assert_eq!(float.as_f64(), Some(1.5));
+        assert_eq!(text.as_f64(), None);
+        assert_eq!(bytes.as_f64(), None);
+    }
+
+    #[test]
+    fn formats_each_decoded_value_variant() {
+        assert_eq!(DecodedValue::UnsignedInteger(3).to_string(), "3");
+        assert_eq!(DecodedValue::SignedInteger(-3).to_string(), "-3");
+        assert_eq!(DecodedValue::Float(1.25).to_string(), "1.25");
+        assert_eq!(DecodedValue::String("ok".into()).to_string(), "ok");
+        assert_eq!(DecodedValue::ByteArray(vec![1, 2]).to_string(), "[2 bytes]");
+        assert_eq!(
+            DecodedValue::MimeSample(vec![1]).to_string(),
+            "[MIME sample: 1 bytes]"
+        );
+        assert_eq!(
+            DecodedValue::MimeStream(vec![1, 2]).to_string(),
+            "[MIME stream: 2 bytes]"
+        );
+        assert_eq!(DecodedValue::Unknown.to_string(), "<unknown>");
+    }
+}

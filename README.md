@@ -59,6 +59,27 @@ writer.add_channel(&cg, None, |ch| {
 // ... write data
 ```
 
+### Recovering unfinalized recordings
+
+`RecoveredMdfIndex` scans supported unfinalized direct-DT recordings without
+changing the source file. It counts and indexes interleaved records, including
+variable-length records, and reads scalar channels from fixed-size groups.
+Unsupported flags and layouts return errors. Recovery uses memory proportional
+to the number of records; the source must remain unchanged while using the index.
+
+```rust
+use mdf4_rs::{BufferedRangeReader, index::RecoveredMdfIndex};
+
+let index = RecoveredMdfIndex::from_file("recording.mf4")?;
+let mut reader = BufferedRangeReader::new("recording.mf4")?;
+let samples = index.read_group_time_range(0, &[1], Some(0), None, None, &mut reader)?;
+```
+
+Run `cargo run --example recover_unfinalized -- [path [group channel [time-channel start end]]]`
+to inspect a recording. The example defaults to the bundled 11-bit OBD fixture
+and reads the first five records; pass a time channel and bounds to also read a
+time range.
+
 ### CAN Logging
 
 ```rust
@@ -85,6 +106,8 @@ See [`examples/`](./examples/) for complete working examples:
 - `lin_logging.rs` - LIN bus logging
 - `flexray_logging.rs` - FlexRay bus logging
 - `index_operations.rs` - Efficient file indexing
+- `time_range.rs` - Streaming channel reads within inclusive time bounds
+- `recover_unfinalized.rs` - Recover and inspect unfinalized recordings
 - `merge_files.rs` - Merging multiple MDF4 files
 - `cut_file.rs` - Extracting time segments
 - `no_std_write.rs` - Writing MDF4 in no_std environments

@@ -89,3 +89,37 @@ impl core::fmt::Display for ConversionType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::ConversionType;
+
+    #[test]
+    fn maps_and_formats_all_known_conversion_types() {
+        let expected = [
+            "identity",
+            "linear",
+            "rational",
+            "algebraic",
+            "table (interpolated)",
+            "table",
+            "range lookup",
+            "value to text",
+            "range to text",
+            "text to value",
+            "text to text",
+            "bitfield text",
+        ];
+
+        for (value, display) in expected.into_iter().enumerate() {
+            let conversion = ConversionType::from_u8(value as u8);
+            assert_eq!(conversion.to_u8(), value as u8);
+            assert_eq!(conversion.to_string(), display);
+        }
+
+        let unknown = ConversionType::from_u8(42);
+        assert_eq!(unknown, ConversionType::Unknown(42));
+        assert_eq!(unknown.to_u8(), 42);
+        assert_eq!(unknown.to_string(), "unknown(42)");
+    }
+}

@@ -1,6 +1,9 @@
 //! Integration tests for MDF4 data files.
 
-use mdf4_rs::{DataType, DecodedValue, Error, MDF, MdfWriter, Result};
+use mdf4_rs::{
+    BufferedRangeReader, DataType, DecodedValue, Error, MDF, MdfWriter, Result,
+    index::RecoveredMdfIndex,
+};
 use std::path::Path;
 
 const TEST_DATA_DIR: &str = "tests/data";
@@ -85,6 +88,77 @@ fn unfinmf_29bit_wwh_obd_loads() {
     let mdf = result.unwrap();
     let groups = mdf.channel_groups();
     assert!(!groups.is_empty(), "Should have at least one channel group");
+}
+
+#[test]
+fn recovers_11bit_interleaved_records_without_modifying_the_file() -> Result<()> {
+    let path = test_data_path("11-bit-obd2.MF4");
+    let before = std::fs::read(&path)?;
+    let index = RecoveredMdfIndex::from_file(&path)?;
+    let group = &index.channel_groups()[0];
+    assert_eq!(group.record_count, 37_538);
+    let timestamp = group
+        .channels
+        .iter()
+        .position(|channel| channel.name.as_deref() == Some("Timestamp"))
+        .expect("fixture timestamp channel");
+    let mut reader = BufferedRangeReader::new(&path)?;
+    let first =
+        index.read_group_time_range(0, &[timestamp], None, Some(0.0), Some(2.0), &mut reader)?;
+    assert_eq!(first.times, [0.0, 1.0, 2.0]);
+    for (value, expected) in first.values[0].iter().zip([1.0713, 1.08465, 1.10405]) {
+        assert!((value.expect("numeric timestamp") - expected).abs() < 1e-12);
+    }
+    let range = index.read_group_time_range(
+        0,
+        &[timestamp],
+        Some(timestamp),
+        Some(1.07),
+        Some(1.09),
+        &mut reader,
+    )?;
+    assert_eq!(range.times.len(), 2);
+    for (time, expected) in range.times.iter().zip([1.0713, 1.08465]) {
+        assert!((time - expected).abs() < 1e-12);
+    }
+    let last = index.read_group_time_range(
+        0,
+        &[timestamp],
+        None,
+        Some(37_537.0),
+        Some(37_537.0),
+        &mut reader,
+    )?;
+    assert!((last.values[0][0].expect("numeric timestamp") - 1176.1606).abs() < 1e-12);
+    assert_eq!(std::fs::read(&path)?, before);
+    Ok(())
+}
+
+#[test]
+fn recovers_29bit_record_counts_and_interleaved_group_values() -> Result<()> {
+    let path = test_data_path("29-bit-obd2.MF4");
+    let index = RecoveredMdfIndex::from_file(&path)?;
+    let mut reader = BufferedRangeReader::new(&path)?;
+    for (group_index, count, expected) in [(0, 2, 15.52635), (23, 17, 2.5212), (24, 11, 2.51995)] {
+        let group = &index.channel_groups()[group_index];
+        assert_eq!(group.record_count, count);
+        let timestamp = group
+            .channels
+            .iter()
+            .position(|channel| channel.name.as_deref() == Some("Timestamp"))
+            .expect("fixture timestamp channel");
+        let first = index.read_group_time_range(
+            group_index,
+            &[timestamp],
+            None,
+            Some(0.0),
+            Some(0.0),
+            &mut reader,
+        )?;
+        assert_eq!(first.times, [0.0]);
+        assert!((first.values[0][0].expect("numeric timestamp") - expected).abs() < 1e-12);
+    }
+    Ok(())
 }
 
 // ============================================================================

@@ -32,3 +32,32 @@ impl<'a> DataBlockData<'a> {
         self.as_slice().is_empty()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::DataBlockData;
+
+    #[test]
+    fn borrowed_data_exposes_slice_length_and_empty_state() {
+        let data = DataBlockData::Borrowed(&[1, 2, 3]);
+        assert_eq!(data.as_slice(), &[1, 2, 3]);
+        assert_eq!(data.len(), 3);
+        assert!(!data.is_empty());
+
+        let empty = DataBlockData::Borrowed(&[]);
+        assert_eq!(empty.len(), 0);
+        assert!(empty.is_empty());
+    }
+
+    #[cfg(feature = "compression")]
+    #[test]
+    fn owned_data_exposes_slice_length_and_empty_state() {
+        let data = DataBlockData::Owned(vec![4, 5]);
+        assert_eq!(data.as_slice(), &[4, 5]);
+        assert_eq!(data.len(), 2);
+        assert!(!data.is_empty());
+
+        let empty = DataBlockData::Owned(Vec::new());
+        assert!(empty.is_empty());
+    }
+}

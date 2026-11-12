@@ -28,3 +28,18 @@ impl EventSyncType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::EventSyncType;
+
+    #[test]
+    fn parses_known_sync_types_and_rejects_unknown_values() {
+        assert_eq!(EventSyncType::from_u8(1), Some(EventSyncType::Time));
+        assert_eq!(EventSyncType::from_u8(2), Some(EventSyncType::Angle));
+        assert_eq!(EventSyncType::from_u8(3), Some(EventSyncType::Distance));
+        assert_eq!(EventSyncType::from_u8(4), Some(EventSyncType::Index));
+        assert_eq!(EventSyncType::from_u8(0), None);
+        assert_eq!(EventSyncType::from_u8(5), None);
+    }
+}

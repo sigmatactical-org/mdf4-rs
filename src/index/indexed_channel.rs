@@ -43,6 +43,9 @@ pub struct IndexedChannel {
     pub bit_count: u32,
     /// Channel type (0=data, 1=VLSD, 2=master, etc.)
     pub channel_type: u8,
+    /// Address of a component channel or array definition, if present.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub component_addr: u64,
     /// Channel flags indicating invalidation bit presence and other properties
     pub flags: u32,
     /// Position of invalidation bit within invalidation bytes (if used)

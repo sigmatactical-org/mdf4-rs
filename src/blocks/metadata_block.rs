@@ -114,3 +114,39 @@ impl Default for MetadataBlock {
         Self::new("")
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::MetadataBlock;
+    use crate::blocks::common::BlockParse;
+
+    #[test]
+    fn constructors_and_binary_round_trip_preserve_xml() {
+        let block = MetadataBlock::new("<metadata/>");
+        let bytes = block.to_bytes().unwrap();
+        let parsed = MetadataBlock::from_bytes(&bytes).unwrap();
+        assert_eq!(parsed.xml, "<metadata/>");
+        assert_eq!(parsed.header.length as usize, bytes.len());
+        assert_eq!(MetadataBlock::new_empty().xml, "");
+        assert_eq!(MetadataBlock::default().xml, "");
+    }
+
+    #[test]
+    fn serialization_and_parsing_reject_invalid_blocks() {
+        let mut block = MetadataBlock::new("<m/>");
+        block.header.id = "##TX".into();
+        assert!(block.to_bytes().is_err());
+
+        let mut block = MetadataBlock::new("<m/>");
+        block.header.length += 8;
+        assert!(block.to_bytes().is_err());
+
+        let valid = MetadataBlock::new("<m/>").to_bytes().unwrap();
+        assert!(MetadataBlock::from_bytes(&valid[..24]).is_err());
+
+        let mut invalid_utf8 = valid;
+        invalid_utf8[24] = 0xff;
+        let parsed = MetadataBlock::from_bytes(&invalid_utf8).unwrap();
+        assert!(parsed.xml.contains('\u{fffd}'));
+    }
+}

@@ -45,11 +45,17 @@ impl ByteRangeReader for FileRangeReader {
         offset: u64,
         length: u64,
     ) -> core::result::Result<Vec<u8>, Self::Error> {
+        offset
+            .checked_add(length)
+            .ok_or_else(|| Error::BlockSerializationError("Byte range overflows".to_string()))?;
+        let length = usize::try_from(length).map_err(|_| {
+            Error::BlockSerializationError("Byte range length does not fit usize".to_string())
+        })?;
         self.file
             .seek(SeekFrom::Start(offset))
             .map_err(Error::IOError)?;
 
-        let mut buffer = vec![0u8; length as usize];
+        let mut buffer = vec![0u8; length];
         self.file.read_exact(&mut buffer).map_err(Error::IOError)?;
 
         Ok(buffer)

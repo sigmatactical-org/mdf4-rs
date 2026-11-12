@@ -129,3 +129,43 @@ impl core::fmt::Display for DataType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::DataType;
+
+    #[test]
+    fn maps_formats_and_reports_default_widths_for_all_types() {
+        let cases = [
+            (DataType::UnsignedIntegerLE, "uint (LE)", 32),
+            (DataType::UnsignedIntegerBE, "uint (BE)", 32),
+            (DataType::SignedIntegerLE, "int (LE)", 32),
+            (DataType::SignedIntegerBE, "int (BE)", 32),
+            (DataType::FloatLE, "float (LE)", 32),
+            (DataType::FloatBE, "float (BE)", 32),
+            (DataType::StringLatin1, "string (Latin-1)", 8),
+            (DataType::StringUtf8, "string (UTF-8)", 8),
+            (DataType::StringUtf16LE, "string (UTF-16 LE)", 8),
+            (DataType::StringUtf16BE, "string (UTF-16 BE)", 8),
+            (DataType::ByteArray, "byte array", 8),
+            (DataType::MimeSample, "MIME sample", 8),
+            (DataType::MimeStream, "MIME stream", 8),
+            (DataType::CanOpenDate, "CANopen date", 64),
+            (DataType::CanOpenTime, "CANopen time", 64),
+            (DataType::ComplexLE, "complex (LE)", 64),
+            (DataType::ComplexBE, "complex (BE)", 64),
+        ];
+
+        for (value, (data_type, display, bits)) in cases.into_iter().enumerate() {
+            assert_eq!(DataType::from_u8(value as u8), data_type);
+            assert_eq!(data_type.to_u8(), value as u8);
+            assert_eq!(data_type.default_bits(), bits);
+            assert_eq!(data_type.to_string(), display);
+        }
+
+        assert_eq!(DataType::from_u8(17), DataType::Unknown(()));
+        assert_eq!(DataType::Unknown(()).to_u8(), 0);
+        assert_eq!(DataType::Unknown(()).default_bits(), 8);
+        assert_eq!(DataType::Unknown(()).to_string(), "unknown");
+    }
+}

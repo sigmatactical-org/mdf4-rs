@@ -8,10 +8,11 @@ pub use dz_compression_type::DzCompressionType;
 
 use crate::{
     Error, Result,
-    blocks::common::{BlockHeader, BlockParse, read_u8, read_u32, read_u64, validate_buffer_size},
+    blocks::common::{
+        BlockHeader, BlockParse, read_u8, read_u32, read_u64, u64_to_usize, validate_buffer_size,
+    },
 };
 use alloc::string::ToString;
-use alloc::vec;
 use alloc::vec::Vec;
 
 /// DZ Block - Zlib compressed data block.
@@ -72,7 +73,17 @@ impl<'a> BlockParse<'a> for DzBlock<'a> {
         let original_data_length = read_u64(bytes, 32);
         let compressed_data_length = read_u64(bytes, 40);
 
-        let data_end = DZ_HEADER_SIZE + compressed_data_length as usize;
+        let compressed_length = u64_to_usize(compressed_data_length, "DZ compressed length")?;
+        let data_end = DZ_HEADER_SIZE
+            .checked_add(compressed_length)
+            .ok_or_else(|| {
+                Error::BlockSerializationError("DZ compressed length overflows".into())
+            })?;
+        if data_end as u64 > header.length {
+            return Err(Error::BlockSerializationError(
+                "DZ data exceeds block length".into(),
+            ));
+        }
         validate_buffer_size(bytes, data_end)?;
 
         let data = &bytes[DZ_HEADER_SIZE..data_end];
@@ -101,15 +112,15 @@ impl DzBlock<'_> {
     /// Returns an error if decompression fails or the decompressed size
     /// doesn't match the expected original size.
     pub fn decompress(&self) -> Result<Vec<u8>> {
-        use miniz_oxide::inflate::decompress_to_vec_zlib;
+        use miniz_oxide::inflate::decompress_to_vec_zlib_with_limit;
 
-        // First decompress the zlib data
-        let decompressed = decompress_to_vec_zlib(self.data).map_err(|e| {
-            Error::BlockSerializationError(alloc::format!("DZ decompression failed: {:?}", e))
+        let expected = u64_to_usize(self.original_data_length, "DZ original length")?;
+        let decompressed = decompress_to_vec_zlib_with_limit(self.data, expected).map_err(|e| {
+            Error::BlockSerializationError(alloc::format!("DZ decompression failed: {}", e))
         })?;
 
         // Validate decompressed size matches expected
-        if decompressed.len() != self.original_data_length as usize {
+        if decompressed.len() != expected {
             return Err(Error::BlockSerializationError(alloc::format!(
                 "DZ decompressed size mismatch: expected {}, got {}",
                 self.original_data_length,
@@ -137,9 +148,9 @@ impl DzBlock<'_> {
         }
 
         let total_bytes = data.len();
-        let rows = total_bytes.div_ceil(columns);
+        let rows = total_bytes / columns;
 
-        let mut result = vec![0u8; total_bytes];
+        let mut result = data.clone();
 
         // Transposed data is stored column-by-column
         // We need to restore row-by-row order
@@ -148,9 +159,7 @@ impl DzBlock<'_> {
                 let src_idx = col * rows + row;
                 let dst_idx = row * columns + col;
 
-                if src_idx < total_bytes && dst_idx < total_bytes {
-                    result[dst_idx] = data[src_idx];
-                }
+                result[dst_idx] = data[src_idx];
             }
         }
 
@@ -161,6 +170,7 @@ impl DzBlock<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec;
 
     fn create_dz_header(
         original_type: &[u8; 2],
@@ -232,6 +242,16 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[test]
+    fn rejects_invalid_compressed_lengths() {
+        let mut bytes = create_dz_header(b"DT", 0, 0, 0, 0);
+        bytes[40..48].copy_from_slice(&u64::MAX.to_le_bytes());
+        assert!(DzBlock::from_bytes(&bytes).is_err());
+        bytes[40..48].copy_from_slice(&4u64.to_le_bytes());
+        bytes.extend_from_slice(&[0; 4]);
+        assert!(DzBlock::from_bytes(&bytes).is_err());
+    }
+
     #[cfg(feature = "compression")]
     mod compression_tests {
         use super::*;
@@ -292,6 +312,20 @@ mod tests {
         }
 
         #[test]
+        fn decompress_transposition_with_partial_row() {
+            let original = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+            let transposed = [1, 5, 2, 6, 3, 7, 4, 8, 9, 10];
+            let compressed = compress_to_vec_zlib(&transposed, 6);
+            let mut bytes =
+                create_dz_header(b"DT", 1, 4, original.len() as u64, compressed.len() as u64);
+            bytes.extend_from_slice(&compressed);
+            assert_eq!(
+                DzBlock::from_bytes(&bytes).unwrap().decompress().unwrap(),
+                original
+            );
+        }
+
+        #[test]
         fn decompress_size_mismatch() {
             let original_data = b"test";
             let compressed = compress_to_vec_zlib(original_data, 6);
@@ -303,6 +337,17 @@ mod tests {
             let dz = DzBlock::from_bytes(&bytes).unwrap();
             let result = dz.decompress();
             assert!(result.is_err());
+        }
+
+        #[test]
+        fn decompression_is_limited_to_declared_size() {
+            let original_data = vec![0; 1024];
+            let compressed = compress_to_vec_zlib(&original_data, 6);
+            let mut bytes = create_dz_header(b"DT", 0, 0, 1, compressed.len() as u64);
+            bytes.extend_from_slice(&compressed);
+
+            let dz = DzBlock::from_bytes(&bytes).unwrap();
+            assert!(dz.decompress().is_err());
         }
     }
 }
